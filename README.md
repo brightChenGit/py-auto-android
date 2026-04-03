@@ -1,10 +1,12 @@
 # 1.说明
 多设备自动化控制与数据采集辅助工具
 
-
 github开源地址：https://github.com/brightChenGit/py-auto-android
+
 博客地址：https://www.brightchen.top/3494cdb3.html
-联系方式：1024347104@qq.com  
+
+联系方式：1024347104@qq.com
+
 打赏地址：https://www.brightchen.top/pyauto/
 
 ## 项目简介
