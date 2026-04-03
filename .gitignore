@@ -1,0 +1,21 @@
+# Created by .ignore support plugin (hsz.mobi)
+*.iml
+*.ipr
+.vscode
+*.iws
+out/
+.git/
+.idea_modules/
+target/
+
+.idea/
+.ideaDataSources/
+.venv/
+logs/
+dist/
+build/
+Release_Build/
+device_configs.json
+py-auto.log
+*.spec
+py_auto.egg-info/

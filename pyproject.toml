@@ -1,0 +1,50 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "py-auto"
+version = "0.1.0"
+description = "基于 PySide6, PaddleOCR 和 uiautomator2 的自动化工具"
+readme = "README.md"
+requires-python = ">=3.11.9"
+
+# 👇 这里填入了文档 [1] 中的所有依赖
+dependencies = [
+    "dbutils==3.1.2",
+    "numpy==2.4.4",
+    "paddleocr==3.4.0",
+    "Pillow==12.1.1",
+    "pymysql==1.1.2",
+    "PySide6==6.11.0",
+    "PySide6-Addons==6.11.0",
+    "PySide6-Essentials==6.11.0",
+    "qasync==0.28.0",
+    "uiautomator2==3.5.0"
+]
+
+authors = [
+    {name = "bright", email = "1024347104@qq.com"}
+]
+
+[project.optional-dependencies]
+# 开发/打包依赖
+dev = [
+    "pyinstaller",
+    "pipreqs" # 如果你还要用它生成依赖
+]
+
+# 🔧 关键配置：告诉 setuptools 去 src 目录下寻找包
+[tool.setuptools.packages.find]
+where = ["src"]
+# include = ["pyauto*"] # 如果报错可以尝试这行，或者只用下面的
+# 更精确的写法是指定包名
+# packages = ["pyauto"]
+
+# 🔧 可选配置：将 build.py 中的硬编码参数移到这里
+# 这样 build.py 可以读取这些值，避免在两个文件里改
+[tool.pyinstaller]
+name = "py-auto"
+main_script = "src/pyauto/main.py"
+onefile = false
+noconfirm = true
