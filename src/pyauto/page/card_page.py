@@ -81,7 +81,7 @@ class ScreenCaptureThread(QThread):
 
     def stop(self):
         self._running = False
-        self.wait(500)
+        self.wait()
 
     def log_message(self, message: str, level: str = "INFO"):
         self.log_signal.emit(message, level)
