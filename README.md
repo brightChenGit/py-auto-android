@@ -226,10 +226,10 @@ python3 -m uiautodev
 ```  
 
 ## 8.其他说明
-已封装paddleOrc工具类和其PP-OCRv5 mobile模型，已封装myssql的工具类，adb的工具类和日志的工具类
+已封装rapid_ocr工具类和其PP-OCRv5 mobile模型，已封装myssql的工具类，adb的工具类和日志的工具类
 
 models
-src/pauto/utils/ocr_util.py  
+src/pauto/utils/rapid_ocr_util.py  
 src/pauto/utils/mydb.py  
 src/pauto/utils/adb.py  
 src/pauto/utils/logUtil.py

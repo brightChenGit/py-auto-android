@@ -5,6 +5,8 @@ import logging
 from typing import Dict, Any
 from multiprocessing import Queue
 import multiprocessing as mp
+from pyauto.scripts.task_runner import run_business_logic
+import psutil
 
 #
 import pyauto.utils.logUtil
@@ -50,7 +52,7 @@ class WorkerLogicAsync:
             def business_wrapper():
                 # 这里的 local_logger 需要确保也能处理停止信号，或者直接传 stop_event 给 run_business_logic
                 # 假设 task_runner.py 已经修改为接受 mp.Event
-                from pyauto.scripts.task_runner import run_business_logic
+
                 run_business_logic(self.device_id, config, self.stop_event, self.logger)
 
             # 在线程池运行
@@ -129,6 +131,21 @@ def process_worker_entry(device_id: str, config_data: dict, log_queue: Queue, cm
     print(f"[SubProcess {device_id}] [{config_data}]进程启动 (PID: {os.getpid()})", file=sys.stderr)
     # 配置 Logger
     logger = logUtil.init_worker_logger_with_queue(device_id=device_id, log_queue=log_queue)
+
+
+    # 第四步：预加载 OCR (此时它已经处于“无限制”状态)
+    # 这里必须直接导入并实例化，不要依赖后面的类去创建
+    try:
+        from pyauto.utils.rapid_ocr_util import RapidOCRUtil
+        logger.info("🚀 [Preload] 正在预加载 OCR 模型...")
+
+
+        # 如果是单例模式，直接调用即可
+        ocr_instance = RapidOCRUtil()
+
+        logger.info("🚀 [Preload] OCR 模型预加载完成！")
+    except Exception as e:
+        logger.error(f"🚀 [Preload] OCR 预加载失败: {e}")
 
     # 1. 环境准备 (PYTHONPATH 等)
     if getattr(sys, 'frozen', False):
