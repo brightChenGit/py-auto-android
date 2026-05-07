@@ -33,7 +33,7 @@ def build():
         'src/pyauto/main.py', # 入口文件
         '--icon=src/pyauto/imgs/favicon.ico',
         '--name=py-auto',    # 输出的程序名
-
+        '--paths', 'src',
         '--onedir',           # [关键] 使用单目录模式 (适合大文件)
         # '--onefile',        # 注释掉：不适合包含大模型的场景
         '--collect-all', 'uiautomator2', # 收集uiautomator2资源

@@ -34,6 +34,7 @@ def build():
     args = [
         'src/pyauto/main.py', # 入口文件
         '--icon=src/pyauto/imgs/favicon.ico',
+        '--paths', 'src',
         '--name=py-auto',     # 输出的程序名
         '--onefile',          # [关键] 切换为单文件模式
         '--noconsole',      # 可选：如果不需要控制台

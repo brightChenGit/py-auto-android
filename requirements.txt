@@ -1,10 +1,14 @@
 dbutils==3.1.2
 numpy==2.4.4
-paddleocr==3.4.0
-Pillow==12.1.1
+onnxruntime==1.25.1
+opencv_contrib_python==4.10.0.84
+opencv_python==4.13.0.92
+Pillow==12.2.0
+psutil==7.2.2
 pymysql==1.1.2
 pyside6==6.11.0
 pyside6_addons==6.11.0
 pyside6_essentials==6.11.0
 qasync==0.28.0
+rapidocr_onnxruntime==1.4.4
 uiautomator2==3.5.0
