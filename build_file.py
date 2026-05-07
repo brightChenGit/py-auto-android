@@ -33,16 +33,16 @@ def build():
     # 关键点：使用 --onefile，并排除 adb.exe 的 UPX 压缩
     args = [
         'src/pyauto/main.py', # 入口文件
-        '--icon=src/pyauto/img/favicon.ico'
+        '--icon=src/pyauto/imgs/favicon.ico',
         '--name=py-auto',     # 输出的程序名
         '--onefile',          # [关键] 切换为单文件模式
         '--noconsole',      # 可选：如果不需要控制台
         # --- 自动收集 uiautomator2 及其 assets 资源 ---
         # 这会自动包含 u2.jar, atx-agent 等所有依赖，解决 "Resource assets/u2.jar not found" 错误
         '--collect-all', 'uiautomator2',
-        # --- 自动收集 paddleocr 及其模型加载依赖 ---
-        # 防止 PaddleOCR 运行时找不到动态库或配置
-        '--collect-all', 'paddleocr',
+        # --- 自动收集 rapidocr 及其模型加载依赖 ---
+        # 防止 rapidocr 运行时找不到动态库或配置
+        '--collect-all', 'rapidocr_onnxruntime',
         '--noconfirm',        # 自动确认覆盖
         '--distpath=dist',    # 输出目录
     ]

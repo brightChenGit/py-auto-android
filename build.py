@@ -31,15 +31,15 @@ def build():
     # 注意：--onedir 是默认行为，但显式声明更清晰
     args = [
         'src/pyauto/main.py', # 入口文件
-        '--icon=src/pyauto/img/favicon.ico'
+        '--icon=src/pyauto/imgs/favicon.ico',
         '--name=py-auto',    # 输出的程序名
 
         '--onedir',           # [关键] 使用单目录模式 (适合大文件)
         # '--onefile',        # 注释掉：不适合包含大模型的场景
         '--collect-all', 'uiautomator2', # 收集uiautomator2资源
-        #自动收集 paddleocr 及其模型加载依赖 ---
-        # 防止 PaddleOCR 运行时找不到动态库或配置
-        '--collect-all', 'paddleocr',
+        #自动收集 rapidocr 及其模型加载依赖 ---
+        # 防止 rapidocr 运行时找不到动态库或配置
+        '--collect-all', 'rapidocr_onnxruntime',
         '--noconsole',            # 不显示控制台窗口 (如果是命令行工具请去掉此行)
         # '--windowed',         # 隐藏控制台 (如果不需要黑框)
         '--noconfirm', # 自动确认覆盖，不再询问
