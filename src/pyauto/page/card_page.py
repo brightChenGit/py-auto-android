@@ -269,6 +269,7 @@ class DeviceCard(QFrame):
         self._update_log_ui(f"等待指令...", "SYS")
 
         main_layout.addWidget(self.log_text)
+        self.start_casting()
 
     def _get_btn_style(self, color):
         return f"""
@@ -281,49 +282,28 @@ class DeviceCard(QFrame):
 
     @Slot(str, str)
     def _update_log_ui(self, message: str, level: str):
-        cursor = self.log_text.textCursor()
-        cursor.movePosition(QTextCursor.MoveOperation.End)
-        self.log_text.appendPlainText(f"[{level}]"+message)
+        """优化版：减少格式化处理，提升性能"""
+        # 直接追加文本，不进行复杂的格式化
+        timestamp = time.strftime("%H:%M:%S")
+        self.log_text.appendPlainText(f"[{level}] {message}")
 
-        color_map = {
-            "ERROR": "#ff6b6b",
-            "WARN": "#feca57",
-            "SYS": "#48dbfb",
-            "INFO": "#00ff00"
-        }
-        color_name = color_map.get(level, "#00ff00")
-
-        last_block = self.log_text.document().lastBlock()
-        selection = QTextEdit.ExtraSelection()
-        selection.cursor = QTextCursor(last_block)
-        selection.cursor.select(QTextCursor.BlockUnderCursor)
-
-        fmt = selection.format
-        fmt.setForeground(QColor(color_name))
-        selection.format = fmt
-        self.log_text.setExtraSelections([selection])
-
+        # 限制日志行数，避免内存泄漏
         doc = self.log_text.document()
-        max_lines = 1000
-        delete_count = 500
-        current_blocks = doc.blockCount()
-
-        if current_blocks > max_lines:
+        max_lines = 300
+        if doc.blockCount() > max_lines:
             cursor = self.log_text.textCursor()
             cursor.beginEditBlock()
-            try:
-                cursor.movePosition(QTextCursor.MoveOperation.Start)
-                lines_to_delete = min(delete_count, current_blocks - 1)
-                for _ in range(lines_to_delete):
-                    if cursor.atEnd(): break
-                    cursor.movePosition(QTextCursor.MoveOperation.NextBlock, QTextCursor.MoveMode.KeepAnchor)
-                delete_end_pos = cursor.position()
-                cursor.movePosition(QTextCursor.Start)
-                cursor.setPosition(delete_end_pos, QTextCursor.KeepAnchor)
-                cursor.removeSelectedText()
-            finally:
-                cursor.endEditBlock()
+            cursor.movePosition(QTextCursor.MoveOperation.Start)
+            # 删除前 200 行
+            lines_to_delete = min(200, doc.blockCount() - max_lines)
+            for _ in range(lines_to_delete):
+                if cursor.atEnd():
+                    break
+                cursor.movePosition(QTextCursor.MoveOperation.NextBlock, QTextCursor.MoveMode.KeepAnchor)
+            cursor.removeSelectedText()
+            cursor.endEditBlock()
 
+        # 自动滚动到底部
         scrollbar = self.log_text.verticalScrollBar()
         scrollbar.setValue(scrollbar.maximum())
 
@@ -452,7 +432,7 @@ class DeviceCard(QFrame):
         """
         return ":" in self.device_id and "." in self.device_id
 
-    def _start_log_listener(self, queue: Queue):
+    def _start_log_listener_thread(self, queue: Queue):
         """启动后台线程监听子进程日志队列"""
         def listen():
             while not self._stop_log_listener:
@@ -469,7 +449,7 @@ class DeviceCard(QFrame):
         self.log_listener_thread = threading.Thread(target=listen, daemon=True)
         self.log_listener_thread.start()
 
-    def _stop_log_listener(self):
+    def _stop_log_listener_thread(self):
         """停止日志监听线程"""
         self._stop_log_listener = True
         if self.log_listener_thread and self.log_listener_thread.is_alive():
@@ -499,7 +479,7 @@ class DeviceCard(QFrame):
         self.cmd_queue = Queue()
 
         # 3. 启动日志监听线程
-        self._start_log_listener(self.log_queue)
+        self._start_log_listener_thread(self.log_queue)
 
         self.log_message(f"{self.device_id}正在启动独立子进程...", "INFO")
         self.update_status("任务启动中...", "#28a745")
@@ -631,12 +611,12 @@ class DeviceCard(QFrame):
             self.worker_process = None
     def hideEvent(self, event):
         super().hideEvent(event)
-        if self.screen_thread and self.screen_thread.isRunning():
-            self.screen_thread.stop()
+        # if self.screen_thread and self.screen_thread.isRunning():
+        #     self.screen_thread.stop()
 
     def showEvent(self, event):
         super().showEvent(event)
-        self.start_casting()
+        # self.start_casting()
 
     def closeEvent(self, event):
         self.is_casting = False
