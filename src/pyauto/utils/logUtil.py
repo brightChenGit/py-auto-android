@@ -132,3 +132,31 @@ def setup_global_log(write_to_file=True):
 
 def get_logger():
     return setup_global_log(write_to_file=True)
+
+def cleanup_all_loggers():
+    """
+    清理所有日志处理器，释放文件句柄。
+    在程序退出前调用此函数以确保日志文件被正确关闭。
+    """
+    # 获取根 logger 和所有子 logger
+    root_logger = logging.getLogger()
+
+    # 关闭根 logger 的所有 handlers
+    for handler in root_logger.handlers[:]:
+        try:
+            handler.flush()
+            handler.close()
+        except Exception:
+            pass
+    root_logger.handlers.clear()
+
+    # 遍历所有已存在的 logger，关闭它们的 handlers
+    for logger_name in logging.Logger.manager.loggerDict:
+        logger = logging.getLogger(logger_name)
+        for handler in logger.handlers[:]:
+            try:
+                handler.flush()
+                handler.close()
+            except Exception:
+                pass
+        logger.handlers.clear()

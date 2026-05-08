@@ -1,6 +1,10 @@
 # main.py
 from pyauto.page.app_page import run_main_app
 import multiprocessing
+import traceback
+import sys
+from pyauto.utils.process_manager import register_cleanup,cleanup_on_exit
+
 
 if __name__ == "__main__":
     # 1. 在开发环境(__name__ == "__main__")：通常无副作用，直接跳过。
@@ -11,10 +15,11 @@ if __name__ == "__main__":
     # 不再有 "子任务模式" 的判断，因为子任务是由另一个独立的 python.exe 进程运行的
     print("[MAIN] 启动 py-auto 主界面...", flush=True)
     try:
+        register_cleanup()
         run_main_app()
     except Exception as e:
         print(f"[MAIN] 启动失败：{e}", flush=True)
-        import traceback
         traceback.print_exc()
-
+        sys.exit(1)
+    sys.exit(0)
 

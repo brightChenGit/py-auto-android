@@ -1,0 +1,10 @@
+{
+    "emulator-5562": {
+        "appTypes": "test",
+        "jobTypes": "test"
+    },
+    "emulator-5564": {
+        "appTypes": "test",
+        "jobTypes": "test"
+    }
+}

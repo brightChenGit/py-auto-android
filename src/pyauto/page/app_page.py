@@ -36,7 +36,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("智能投屏管理系统")
         self.setGeometry(100, 100, 1600, 1000)
-
+        self._is_closing = False
         # 样式表 (保持不变)
         self.setStyleSheet("""
             QMainWindow { background-color: #ffffff; }
@@ -136,6 +136,75 @@ class MainWindow(QMainWindow):
         for i, btn in enumerate(buttons):
             btn.setChecked(i == index)
 
+    def closeEvent(self, event):
+        """窗口关闭时的处理 - 确保所有子进程被终止"""
+        if self._is_closing:
+            event.accept()
+            return
+
+        self._is_closing = True
+        logger.info("=" * 80)
+        logger.info("应用程序正在关闭...")
+        logger.info("=" * 80)
+
+        # 关键：使用 psutil 终止所有子进程
+        try:
+            import os
+            import psutil
+
+            current_pid = os.getpid()
+            logger.info(f"当前主进程 PID: {current_pid}")
+
+            parent = psutil.Process(current_pid)
+            children = parent.children(recursive=True)
+
+            if children:
+                logger.info(f"检测到 {len(children)} 个子进程，开始终止...")
+
+                # 第一阶段：温和终止
+                for child in children:
+                    try:
+                        logger.info(f"  终止子进程: PID={child.pid}, 名称={child.name()}")
+                        child.terminate()
+                    except (psutil.NoSuchProcess, psutil.AccessDenied) as e:
+                        logger.warning(f"  无法终止子进程 {child.pid}: {e}")
+
+                # 等待子进程退出（最多5秒）
+                gone, alive = psutil.wait_procs(children, timeout=5)
+                logger.info(f"已正常退出: {len(gone)} 个进程")
+
+                # 第二阶段：强制终止仍未退出的进程
+                if alive:
+                    logger.warning(f"{len(alive)} 个子进程未响应，强制终止...")
+                    for child in alive:
+                        try:
+                            logger.info(f"  强制终止: PID={child.pid}")
+                            child.kill()
+                        except (psutil.NoSuchProcess, psutil.AccessDenied):
+                            pass
+
+                    # 再次等待
+                    gone, alive = psutil.wait_procs(alive, timeout=2)
+
+                    if alive:
+                        logger.error(f"✗ 以下子进程无法终止: {[p.pid for p in alive]}")
+                        logger.error("提示：可能需要手动在任务管理器中结束这些进程")
+                    else:
+                        logger.info("✓ 所有子进程已成功终止")
+                else:
+                    logger.info("✓ 所有子进程已正常终止")
+            else:
+                logger.info("✓ 未检测到子进程")
+
+        except Exception as e:
+            logger.error(f"终止子进程时出错: {e}", exc_info=True)
+
+        logger.info("=" * 80)
+        logger.info("应用程序已关闭")
+        logger.info("=" * 80)
+
+        event.accept()
+
 def run_main_app():
     """主程序启动入口函数"""
     logger.info("主程序启动...")
@@ -149,10 +218,16 @@ def run_main_app():
     window = MainWindow()
     window.show()
 
-    # 这样 create_task 创建的任务才会被 Qt 事件循环调度执行
-    with loop:
-        # 如果你的 MainWindow 有异步初始化方法 (如 startup)，可以在这里调用
-        # loop.run_until_complete(window.startup())
+    # 使用 qasync 的正确方式
+    try:
+        with loop:
+            # 如果有异步任务，可以这样创建
+            # loop.create_task(some_async_function())
 
-        # 直接运行 Qt 事件循环，qasync 会自动处理 asyncio 任务
-        loop.run_until_complete(app.exec_())
+            # 运行 Qt 事件循环
+            app.exec()
+    except Exception as e:
+        logger.error(f"应用运行出错: {e}", exc_info=True)
+        raise
+    finally:
+        logger.info("应用已退出")

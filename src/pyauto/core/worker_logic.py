@@ -133,19 +133,7 @@ def process_worker_entry(device_id: str, config_data: dict, log_queue: Queue, cm
     logger = logUtil.init_worker_logger_with_queue(device_id=device_id, log_queue=log_queue)
 
 
-    # 第四步：预加载 OCR (此时它已经处于“无限制”状态)
-    # 这里必须直接导入并实例化，不要依赖后面的类去创建
-    try:
-        from pyauto.utils.rapid_ocr_util import RapidOCRUtil
-        logger.info("🚀 [Preload] 正在预加载 OCR 模型...")
 
-
-        # 如果是单例模式，直接调用即可
-        ocr_instance = RapidOCRUtil()
-
-        logger.info("🚀 [Preload] OCR 模型预加载完成！")
-    except Exception as e:
-        logger.error(f"🚀 [Preload] OCR 预加载失败: {e}")
 
     # 1. 环境准备 (PYTHONPATH 等)
     if getattr(sys, 'frozen', False):
@@ -243,6 +231,13 @@ def process_worker_entry(device_id: str, config_data: dict, log_queue: Queue, cm
             if pending:
                 loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
             loop.close()
+        try:
+            logUtil.cleanup_all_loggers()
+            print(f"[SubProcess {device_id}] 日志系统已关闭", file=sys.stderr)
+        except Exception as e:
+            print(f"[SubProcess {device_id}] 清理日志失败: {e}", file=sys.stderr)
+
+        print(f"[SubProcess {device_id}] 进程退出", file=sys.stderr)
 
 # ----------------------------------------------------------------------
 # 主进程调用示例 (仅供参考，实际在你的 UI 主逻辑中)

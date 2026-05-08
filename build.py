@@ -37,6 +37,7 @@ def build():
         '--onedir',           # [关键] 使用单目录模式 (适合大文件)
         # '--onefile',        # 注释掉：不适合包含大模型的场景
         '--collect-all', 'uiautomator2', # 收集uiautomator2资源
+        '--collect-all', 'psutil',  # 添加 psutil 支持进程管理
         #自动收集 rapidocr 及其模型加载依赖 ---
         # 防止 rapidocr 运行时找不到动态库或配置
         '--collect-all', 'rapidocr_onnxruntime',
