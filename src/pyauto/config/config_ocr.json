@@ -1,0 +1,4 @@
+{
+    "use_cuda": false,
+    "use_dml": true
+}

@@ -234,4 +234,18 @@ src/pauto/utils/mydb.py
 src/pauto/utils/adb.py  
 src/pauto/utils/logUtil.py
 
+ocr识别加速设置
+config_ocr.json
+1.默认使用CPU（都为false是）
+2.use_cuda NVIDA显卡加速（2选1）
+3.use_dml 通用显卡加速（2选1）
 
+开启加速后，每个设备会加载模型到内存增加占用（800MB~900MB）
+
+```json
+{
+  "use_cuda": false,
+  "use_dml": false
+}
+
+```

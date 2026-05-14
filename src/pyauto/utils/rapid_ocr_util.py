@@ -1,7 +1,6 @@
 """
 文件名: rapid_ocr_util.py
 功能: 封装 RapidOCR 的工具类 (单例模式)
-作者: AI 助手
 备注:
     1. 请确保已安装 rapidocr_onnxruntime 库。
     2. 请在代码同级目录下放置模型文件夹。
@@ -14,10 +13,10 @@ import os
 import threading
 from typing import List, Optional, Tuple, Any, Dict
 import numpy as np
-import onnxruntime as ort
+from pyauto.config.config_ocr import ConfigOcrManager
 
 # RapidOCR 相关导入
-from rapidocr_onnxruntime import RapidOCR
+from rapidocr  import RapidOCR
 
 # 假设你有一个 path_utils，如果没有，请替换为直接路径拼接
 from pyauto.utils.path_utils import model_resource_path
@@ -45,130 +44,90 @@ class RapidOCRUtil:
     def __init__(self):
         # ⭐️ 关键修改：检查当前进程是否已初始化
         current_pid = os.getpid()
-        
+
         # 快速检查：如果当前进程已有缓存，直接复用
         if current_pid in _engines_cache and _engines_cache[current_pid] is not None:
             self._engine = _engines_cache[current_pid]
             return
-        
+
         # 需要初始化，加锁保护
         with _init_lock:
             # 双重检查：防止多线程竞争
             if current_pid in _engines_cache and _engines_cache[current_pid] is not None:
                 self._engine = _engines_cache[current_pid]
                 return
-            
+
             # 执行初始化
             self._init_engine()
-            
+
             # 保存到进程缓存
             _engines_cache[current_pid] = self._engine
             print(f"✅ [OCR] 进程 {current_pid} 初始化完成")
 
 
     def _init_engine(self):
-        """初始化 OCR 引擎（每个进程只执行一次）"""
+        """初始化 OCR 引擎（适配 rapidocr v3+ 配置结构 + DirectML）"""
         try:
             pid = os.getpid()
-            print(f"🔧 [OCR-{pid}] 开始初始化 OCR 引擎...")
-            # 1. 开启 ONNX 的图优化 (关键!)
-            sess_options = ort.SessionOptions()
-            sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+            print(f"🔧 [OCR-{pid}] 正在初始化...")
 
-            # 2. 获取当前环境支持的所有加速提供者
-            available_providers = ort.get_available_providers()
-            print(f"🔍 [OCR] ONNX Runtime 可用设备: {available_providers}")
-
-            # 3. 定义优先级策略
-            # 逻辑：如果有 CUDA (NVIDIA) 优先用 CUDA；否则如果有 DML (Intel/AMD) 用 DML；最后回退到 CPU
-            target_providers = ['CPUExecutionProvider'] # 默认回退到 CPU
-
-            if 'CUDAExecutionProvider' in available_providers:
-                target_providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
-                print("⚡ [OCR] 检测到 NVIDIA GPU，已启用 CUDA 加速")
-            elif 'DmlExecutionProvider' in available_providers:
-                target_providers = ['DmlExecutionProvider', 'CPUExecutionProvider']
-                print("⚡ [OCR] 检测到 DirectML 设备 (Intel/AMD)，已启用 DirectML 加速")
-            elif 'OpenVINOExecutionProvider' in available_providers:
-                # 额外赠送：如果你的 Intel 显卡装了 OpenVINO 插件，这个通常比 DirectML 更快
-                target_providers = ['OpenVINOExecutionProvider', 'CPUExecutionProvider']
-                print("⚡ [OCR] 检测到 OpenVINO 设备，已启用 OpenVINO 加速")
-            else:
-                print("⚠️ [OCR] 未检测到 GPU 加速库，使用 CPU 模式 (速度较慢)")
-            # =================================================
-            # 🚀 核心修改：动态计算模型路径
-            # =================================================
-            RELATIVE_MODEL_DIR = "models"  # 你的模型文件夹名
-            REAL_MODEL_DIR = model_resource_path(RELATIVE_MODEL_DIR)
-
-            # 1. 检测模型 (Detection)
-            # DET_MODEL_PATH = os.path.join(REAL_MODEL_DIR, "PP-OCRv5/det/ch_PP-OCRv5_det_mobile.onnx")
+            # 1. 计算模型路径
+            # 注意：这里假设你的模型文件夹结构是：models/PP-OCRv4/det/xxx.onnx
+            REAL_MODEL_DIR = model_resource_path("models")
             DET_MODEL_PATH = os.path.join(REAL_MODEL_DIR, "PP-OCRv4/det/ch_PP-OCRv4_det_mobile.onnx")
-            # DET_MODEL_PATH = os.path.join(REAL_MODEL_DIR, "PP-OCRv4/det/ch_PP-OCRv4_det_server.onnx")
-            # DET_MODEL_PATH = os.path.join(REAL_MODEL_DIR, "PP-OCRv5/det/ch_PP-OCRv5_det_server.onnx")
 
             # 2. 识别模型 (Recognition)
-            # REC_MODEL_PATH = os.path.join(REAL_MODEL_DIR, "PP-OCRv5/rec/ch_PP-OCRv5_rec_mobile.onnx")
             REC_MODEL_PATH = os.path.join(REAL_MODEL_DIR, "PP-OCRv4/rec/ch_PP-OCRv4_rec_mobile.onnx")
-            # REC_MODEL_PATH = os.path.join(REAL_MODEL_DIR, "PP-OCRv4/rec/ch_PP-OCRv4_rec_server.onnx")
-            # REC_MODEL_PATH = os.path.join(REAL_MODEL_DIR, "PP-OCRv5/rec/ch_PP-OCRv5_rec_server.onnx")
 
             # 3. 方向分类模型 (Direction Classification)
-            # CLS_MODEL_PATH = os.path.join(REAL_MODEL_DIR, "PP-OCRv5/cls/ch_PP-LCNet_x0_25_textline_ori_cls_mobile.onnx")
             CLS_MODEL_PATH = os.path.join(REAL_MODEL_DIR, "PP-OCRv4/cls/ch_ppocr_mobile_v2.0_cls_mobile.onnx")
 
             # 检查模型文件是否存在
             det_model = DET_MODEL_PATH if os.path.exists(DET_MODEL_PATH) else None
             rec_model = REC_MODEL_PATH if os.path.exists(REC_MODEL_PATH) else None
             cls_model = CLS_MODEL_PATH if os.path.exists(CLS_MODEL_PATH) else None
+            # 2. 构建参数字典 (Params)
+            # 关键点：必须严格按照 config.yaml 中的层级书写键名
+            params = {
+                # --- 核心配置：指定模型根目录 ---
+                # RapidOCR 会自动在这个目录下寻找 PP-OCRv4 等子文件夹
+                # "Global.model_root_dir": REAL_MODEL_DIR,
+                "Det.model_path": det_model,
+                "Rec.model_path": rec_model,
 
-            # =================================================
-            # 🔑 初始化 RapidOCR
-            # =================================================
-            # 注意: RapidOCR 使用 ONNXRuntime，无需设置 MKLDNN
-            engine = RapidOCR(
-                # 模型路径配置
-                det_model_path=det_model,
-                rec_model_path=rec_model,
-                # cls_model_path=cls_model,
-                cls_model_path=None,
+                # --- 日志级别 (可选) ---
+                "Global.log_level": "warning", # 减少日志输出
 
-                # 功能开关 (对应 PaddleOCR 的 use_*)
-                use_det=True,      # 开启检测
-                use_rec=True,      # 开启识别
-                use_cls=False,      # 开启方向分类
+                # --- 检测与识别基础开关 (保持开启) ---
+                "Global.use_det": True,
+                "Global.use_rec": True,
+                "Global.use_cls": False, # 如果不需要旋转分类，设为 False 提升速度
+            }
 
+            # --- 针对 DirectML 的特殊配置 ---
+            # 根据你的 config.yaml 结构，我们需要手动指定 ONNX Runtime 的执行提供者
+            # 注意：在旧版本 DirectML 中，通常需要强制关闭 CUDA
+            params.update({
+                "EngineConfig.onnxruntime.enable_cpu_mem_arena": False, # 降低内存占用
+                "EngineConfig.onnxruntime.use_cuda": ConfigOcrManager.get_config().get("use_cuda", False),  # 强制关闭 CUDA
+                "EngineConfig.onnxruntime.use_dml": ConfigOcrManager.get_config().get("use_dml", False),    # 尝试开启 DML (如果库版本支持)
+                # 如果上面的 use_dml 不生效，可能需要通过环境变量或代码层面指定 providers
+            })
 
-                # 性能与设备配置
-                # sess_options=sess_options, # 应用上面的图优化
-                providers=target_providers,
-                # cpu_num_threads=4,
-                # det_db_box_thresh=0.3,   # 检测阈值，降低可减少噪点框
-                # det_db_unclip_ratio=1.5, # 控制框的紧凑程度
-                # max_batch_size=1,        # 确保是 1 (单张推理)
+            # 3. 初始化引擎
+            # 注意：这里传入的是 params 字典，而不是直接传路径
+            engine = RapidOCR(params=params)
 
-                # 线程数 (对应 PaddleOCR 的 cpu_threads，但 RapidOCR 主要由 ONNX 控制)
-                # 可以通过环境变量控制，或者在 ONNX 选项中设置
-                # det_limit_side_len=960, # 预测时图像长边限制，影响速度
-                # rec_image_shape="3, 32, 100" # 识别模型输入形状
-            )
-
-            print(f"✅ [OCR-{pid}] RapidOCR 引擎初始化成功 🚀")
-            
-            # ⭐️ 保存引擎到实例
+            print(f"✅ [OCR-{pid}] 初始化成功 (模型目录: {REAL_MODEL_DIR})")
             self._engine = engine
 
-            # 模型预热 (Warm-up)
-            # dummy_img = np.ones((64, 64, 3), dtype=np.uint8) * 255
-            # try:
-            #     self._engine(dummy_img)
-            #     print("模型预热完成 🔥")
-            # except:
-            #     pass
-
         except Exception as e:
-            print(f"OCR 引擎初始化失败: {e}")
+            print(f"❌ [OCR-{pid}] 初始化失败: {e}")
+            import traceback; traceback.print_exc()
             raise
+
+
+
 
     def ocr_crop(self, image, bounds: List[int]) -> List[str]:
         """
@@ -185,15 +144,18 @@ class RapidOCRUtil:
             # 2. 裁剪区域
             crop_img = image[bounds[1]:bounds[3], bounds[0]:bounds[2]]
 
-            # 3. 执行 OCR
-            # RapidOCR 返回: [[box, text, score], ...]
-            result, _ = self._engine(crop_img)
+            output = self._engine(crop_img)
 
             texts = []
-            if result is not None:
-                for line in result:
-                    # line[1] 是 text
-                    texts.append(line[1])
+            # 新版 output.results 是 List[Dict] 或 List[List]
+            # if output.results:
+            #     for line in output.results:
+            #         # 兼容两种可能的结构：[box, text, score] 或 Dict
+            #         if isinstance(line, (list, tuple)):
+            #             text = line[1] # 通常索引 1 是文本
+            #         elif isinstance(line, dict):
+            #             text = line.get("text", "")
+            #         texts.append(text)
             return texts
 
         except Exception as e:
@@ -214,26 +176,95 @@ class RapidOCRUtil:
             # 如果是 cv2 格式处理，建议转为 BGR (RapidOCR 内部通常处理 BGR 或 RGB 都可以，但 cv2 读取是 BGR)
             # img_cv = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
             # 2. 执行预测
-            result, elapse = self._engine(image)
 
-            # 3. 返回结构化数据
-            # 将 RapidOCR 的格式转换为类似 PaddleOCR 的结构以便兼容
-            # RapidOCR: [ [[x1,y1],...], "文本", 0.99 ]
-            # 转换为: [ [坐标], ("文本", 置信度) ]
+            # result, elapse = self._engine(image)
+            # output = self._engine(image)
+
+            # 执行预测 (新版：接收对象)
+            output = self._engine(image)
+            print(f"{output}")
             formatted_result = []
-            if result is not None:
-                for line in result:
-                    box = line[0]  # 坐标框
-                    text = line[1] # 文本
-                    score = line[2] # 置信度
-                    formatted_result.append([box, (text, score)])
+            if output.results:
+                for line in output.results:
+                    # --- 处理坐标 Box ---
+                    # RapidOCR v3 默认返回 [x1,y1,x2,y2,x3,y3,x4,y4]
+                    # 我们将其转换为 [[x1,y1], [x2,y2], ...] 以便兼容旧逻辑
+                    box_coords = line[0] if isinstance(line, (list, tuple)) else line.get("bbox")
 
+                    if len(box_coords) == 8: # 扁平化坐标
+                        box = [[box_coords[i], box_coords[i+1]] for i in range(0, 8, 2)]
+                    else: # 已经是嵌套列表
+                        box = box_coords
+
+                    # --- 处理文本和置信度 ---
+                    if isinstance(line, (list, tuple)):
+                        text = line[1]
+                        score = line[2] if len(line) > 2 else 0
+                    elif isinstance(line, dict):
+                        text = line.get("text", "")
+                        score = line.get("score", 0)
+
+                    formatted_result.append([box, (text, score)])
             return formatted_result
 
         except Exception as e:
             print(f"全屏 OCR 失败: {e}")
             return []
 
+    def ocr_full_screen(self, image) -> List:
+        """
+        功能: 对全屏图像进行 OCR 识别，返回结构化数据。
+        适配 RapidOCR 最新返回格式 (包含 txts, boxes, scores 属性)。
+        """
+        try:
+            # 1. 类型转换
+            if not isinstance(image, np.ndarray):
+                image = np.array(image)
+
+            # 2. 执行预测
+            output = self._engine(image)
+            # print(f"Raw Output: {output}") # 调试用：打印原始输出
+
+            formatted_result = []
+
+            # --- 关键修复点 ---
+            # 根据日志 [1]，直接使用 output.txts, output.boxes, output.scores
+            # 并且需要通过索引 i 来遍历，而不是 for line in output.results
+
+            texts = output.txts
+            boxes = output.boxes
+            scores = output.scores
+
+            # 确保数据存在且长度一致
+            if texts and len(texts) > 0 and len(texts) == len(boxes):
+                for i in range(len(texts)):
+                    try:
+                        # --- 处理坐标 Box ---
+                        box_array = boxes[i]
+
+                        # 转换为标准 Python 列表
+                        if hasattr(box_array, 'tolist'):
+                            box = box_array.tolist()
+                        else:
+                            box = [[float(p[0]), float(p[1])] for p in box_array]
+
+                        # --- 处理文本和置信度 ---
+                        text = texts[i]
+                        score = scores[i] if i < len(scores) else 0.0
+
+                        formatted_result.append([box, (text, score)])
+
+                    except Exception as e:
+                        # 捕获单行解析错误，防止整个 OCR 崩溃
+                        print(f"解析第 {i} 行 OCR 结果失败: {e}")
+                        continue
+
+            return formatted_result
+
+        except Exception as e:
+            print(f"全屏 OCR 失败: {e}")
+            import traceback; traceback.print_exc()
+            return []
     def ocr_full_screen_fast(self, screenshot, short_side_len: int = 450) -> List[Dict[str, Any]]:
         """
         执行全屏 OCR，自动缩放图片以提升速度，并还原坐标。
