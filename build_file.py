@@ -42,9 +42,11 @@ def build():
         # 这会自动包含 u2.jar, atx-agent 等所有依赖，解决 "Resource assets/u2.jar not found" 错误
         '--collect-all', 'uiautomator2',
         '--collect-all', 'psutil',  # 添加 psutil 支持进程管理
+        '--exclude', 'resource',         # 排除 resource 文件夹
+        '--exclude', 'test',         # 排除 test 文件夹
         # --- 自动收集 rapidocr 及其模型加载依赖 ---
         # 防止 rapidocr 运行时找不到动态库或配置
-        '--collect-all', 'rapidocr_onnxruntime',
+        '--collect-all', 'rapidocr',
         '--noconfirm',        # 自动确认覆盖
         '--distpath=dist',    # 输出目录
     ]
