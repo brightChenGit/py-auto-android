@@ -13,6 +13,8 @@ from PySide6.QtGui import QFont
 from pyauto.page.cluster_page import ClusterPage
 from pyauto.page.job_manage_page import JobManagePage
 from pyauto.page.about_page import AboutPage
+from pyauto.page.sms_page import SmsPage
+from pyauto.page.config_base_page import ConfigBasePage
 from qasync import QEventLoop
 
 # 导入日志 (只有主程序会初始化)
@@ -30,6 +32,19 @@ class AndroidViewPage(QWidget):
         label.setFont(QFont("Arial", 16))
         label.setStyleSheet("color: #888;")
         layout.addWidget(label)
+
+# class PhoneViewPage(QWidget):
+#     """UI 控件管理页面"""
+#     def __init__(self):
+#         super().__init__()
+#         layout = QVBoxLayout(self)
+#         layout.setAlignment(Qt.AlignCenter)
+#         label = QLabel("(功能开发中...)")
+#         label.setAlignment(Qt.AlignCenter)
+#         label.setFont(QFont("Arial", 16))
+#         label.setStyleSheet("color: #888;")
+#         layout.addWidget(label)
+
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -73,23 +88,27 @@ class MainWindow(QMainWindow):
 
         self.btn_cluster = QPushButton("📱 投屏管理 (首页)")
         self.btn_function = QPushButton("📅 任务管理")
-        self.btn_android_view = QPushButton("📅 UI 控件管理")
+        # self.btn_android_view = QPushButton("📅 UI 控件管理")
+        self.btn_phone_view = QPushButton("📅 短信Webhook")
+        self.btn_config_base_view = QPushButton("📅 应用配置")
         # self.btn_donate = QPushButton("💰 打赏作者")
         # 在 __init__ 方法中
         self.btn_about = QPushButton("ℹ️ 关于项目") # 在按钮定义部分
 
 
-
-
-
-
-        for btn in [self.btn_cluster, self.btn_function, self.btn_android_view]:
+        for btn in [self.btn_cluster, self.btn_function,
+                    # self.btn_android_view,
+                    self.btn_phone_view,  self.btn_config_base_view,
+                    self.btn_about]:
             btn.setCheckable(True)
 
         self.btn_cluster.setChecked(True)
 
-        for btn in [self.btn_cluster, self.btn_function, self.btn_android_view,
+        for btn in [self.btn_cluster, self.btn_function,
+                    # self.btn_android_view,
+                    self.btn_phone_view,
                     # self.btn_donate
+                    self.btn_config_base_view,
                     self.btn_about
 
                     ]:
@@ -101,14 +120,18 @@ class MainWindow(QMainWindow):
         # 右侧内容
         self.stacked_widget = QStackedWidget()
         self.cluster_page = ClusterPage()
-        self.android_view_page = AndroidViewPage()
+        # self.android_view_page = AndroidViewPage()
+        self.phone_view_page = SmsPage()
         self.function_page = JobManagePage()
+        self.config_base_page = ConfigBasePage()
         self.about_page = AboutPage()
 
 
         self.stacked_widget.addWidget(self.cluster_page)
         self.stacked_widget.addWidget(self.function_page)
-        self.stacked_widget.addWidget(self.android_view_page)
+        # self.stacked_widget.addWidget(self.android_view_page)
+        self.stacked_widget.addWidget(self.phone_view_page)
+        self.stacked_widget.addWidget(self.config_base_page)
 
 
         # 在连接信号槽的部分 (switch_page附近)
@@ -121,8 +144,10 @@ class MainWindow(QMainWindow):
 
         self.btn_cluster.clicked.connect(lambda: self.switch_page(0))
         self.btn_function.clicked.connect(lambda: self.switch_page(1))
-        self.btn_android_view.clicked.connect(lambda: self.switch_page(2))
-        self.btn_about.clicked.connect(lambda: self.switch_page(3)) # 假设它是第4个页面
+        # self.btn_android_view.clicked.connect(lambda: self.switch_page(2))
+        self.btn_phone_view.clicked.connect(lambda: self.switch_page(2))
+        self.btn_config_base_view.clicked.connect(lambda: self.switch_page(3))
+        self.btn_about.clicked.connect(lambda: self.switch_page(4))
 
         main_layout.addWidget(sidebar)
         main_layout.addWidget(self.stacked_widget)
@@ -132,9 +157,17 @@ class MainWindow(QMainWindow):
 
     def switch_page(self, index):
         self.stacked_widget.setCurrentIndex(index)
-        buttons = [self.btn_cluster, self.btn_function, self.btn_android_view,self.btn_about]
+        buttons = [self.btn_cluster, self.btn_function,
+                   # self.btn_android_view,
+                   self.btn_phone_view,self.btn_config_base_view,self.btn_about]
         for i, btn in enumerate(buttons):
             btn.setChecked(i == index)
+
+        # current_widget = self.stacked_widget.currentWidget()
+        # 判断它是否是 ConfigBasePage 的实例
+        # if isinstance(current_widget, ConfigBasePage):
+            # 如果是，就调用它的 reload_config 方法来重新加载数据
+            # current_widget.reload_config()
 
     def closeEvent(self, event):
         """窗口关闭时的处理 - 确保所有子进程被终止"""

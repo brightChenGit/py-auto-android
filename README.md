@@ -9,6 +9,15 @@ github开源地址：https://github.com/brightChenGit/py-auto-android
 
 打赏地址：https://www.brightchen.top/pyauto/
 
+## 2026.08.05
+1.新增支持邮件发送
+2.新增支持smsforwarder进行短信发送（webhook方式）
+3.Ocr接口服务化
+4.界面美化
+5.增加配置页面，短信配置页面
+
+
+
 ## 项目简介
 本项目是基于 Python 开发的**通用安卓设备自动化操作框架**，提供多设备管理、界面控制、屏幕识别、数据本地存储等基础能力，仅面向企业内部测试、设备运维与合法数据采集场景使用。
 
@@ -120,42 +129,28 @@ github开源地址：https://github.com/brightChenGit/py-auto-android
 python -m pip install --upgrade pip  
   
 # 2. 安装依赖  
-pip install -r requirements.txt  
+（常规安装）
+pip install . 
 ```  
 
 ### 方法二
-```bash  
-# 安装核心自动化库  
-pip install -U uiautomator2  
-  
-# 安装编辑器工具 (用于抓取元素)  
-pip install -U weditor  
-  
-# 安装数据库驱动 (推荐 pymysql 或 mysql-connector-python)pip install pymysql sqlalchemy  
-  
-# 安装 OCR 库 (推荐 PaddleOCR，中文效果最好)  
-pip install paddlepaddle paddleocr  
-  
-pip install PySide6  
-  
-pip install pyinstaller  
-  
-pip install qasync  
-  
-pip install DBUtils  
-```  
 
-
-## 3. dev 环境
 创建虚拟环境
 ```bash
 python -m venv .venv
 ```
-  
-激活虚拟环境  
+
+激活虚拟环境
 ```bash
  .\.venv\Scripts\activate  
 ```
+
+
+
+（可编辑安装）
+```bash  
+pip install -e .
+```  
 
 退出虚拟环境
 
@@ -234,18 +229,5 @@ src/pauto/utils/mydb.py
 src/pauto/utils/adb.py  
 src/pauto/utils/logUtil.py
 
-ocr识别加速设置
-config_ocr.json
-1.默认使用CPU（都为false是）
-2.use_cuda NVIDA显卡加速（2选1）
-3.use_dml 通用显卡加速（2选1）
 
-开启加速后，每个设备会加载模型到内存增加占用（800MB~900MB）
 
-```json
-{
-  "use_cuda": false,
-  "use_dml": false
-}
-
-```

@@ -13,10 +13,12 @@ from PySide6.QtWidgets import (QFrame, QVBoxLayout, QHBoxLayout, QLabel,
 from PySide6.QtCore import Qt, QThread, Signal, Slot
 from PySide6.QtGui import QPixmap, QFont, QTextCursor, QColor
 
+from pyauto.config.config_base import UnifiedConfigManager
 from pyauto.config.config_manager import DeviceConfigManager
 from pyauto.core.worker_logic import process_worker_entry
 from pyauto.utils.adb import AdbManager
 import pyauto.utils.logUtil
+from pyauto.utils.mail_utils import send_email_notification
 
 # 获取全局 logger 实例
 logger =  pyauto.utils.logUtil.get_logger()
@@ -538,6 +540,7 @@ class DeviceCard(QFrame):
             try:
                 self.cmd_queue.put_nowait({'action': 'stop', 'device_id': self.device_id})
                 self.log_message(f"🛑 {self.device_id}已发送停止指令，等待子进程优雅退出...", "SYS")
+
             except Exception as e:
                 self.log_message(f"{self.device_id}发送指令失败：{e}", "ERROR")
 

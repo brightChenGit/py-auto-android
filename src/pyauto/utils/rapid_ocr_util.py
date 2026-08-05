@@ -13,8 +13,8 @@ import os
 import threading
 from typing import List, Optional, Tuple, Any, Dict
 import numpy as np
-from pyauto.config.config_ocr import ConfigOcrManager
-
+from pyauto.config.config_base import UnifiedConfigManager
+import gc
 # RapidOCR 相关导入
 from rapidocr  import RapidOCR
 
@@ -102,6 +102,7 @@ class RapidOCRUtil:
                 "Global.use_det": True,
                 "Global.use_rec": True,
                 "Global.use_cls": False, # 如果不需要旋转分类，设为 False 提升速度
+
             }
 
             # --- 针对 DirectML 的特殊配置 ---
@@ -109,8 +110,8 @@ class RapidOCRUtil:
             # 注意：在旧版本 DirectML 中，通常需要强制关闭 CUDA
             params.update({
                 "EngineConfig.onnxruntime.enable_cpu_mem_arena": False, # 降低内存占用
-                "EngineConfig.onnxruntime.use_cuda": ConfigOcrManager.get_config().get("use_cuda", False),  # 强制关闭 CUDA
-                "EngineConfig.onnxruntime.use_dml": ConfigOcrManager.get_config().get("use_dml", False),    # 尝试开启 DML (如果库版本支持)
+                "EngineConfig.onnxruntime.use_cuda": UnifiedConfigManager.get_config().get("ocr",{}).get("use_cuda", False),  # 强制关闭 CUDA
+                "EngineConfig.onnxruntime.use_dml": UnifiedConfigManager.get_config().get("ocr",{}).get("use_dml", False),    # 尝试开启 DML (如果库版本支持)
                 # 如果上面的 use_dml 不生效，可能需要通过环境变量或代码层面指定 providers
             })
 
@@ -162,54 +163,6 @@ class RapidOCRUtil:
             print(f"区域识别失败: {e}")
             return []
 
-    def ocr_full_screen(self, image) -> List:
-        """
-        功能: 对全屏图像进行 OCR 识别，返回原始结果。
-        :param image: 图像对象 (numpy array)
-        :return: 原始结果列表 (包含坐标和文本)
-        """
-        try:
-            # 1. 类型转换
-            if not isinstance(image, np.ndarray):
-                image = np.array(image)
-
-            # 如果是 cv2 格式处理，建议转为 BGR (RapidOCR 内部通常处理 BGR 或 RGB 都可以，但 cv2 读取是 BGR)
-            # img_cv = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
-            # 2. 执行预测
-
-            # result, elapse = self._engine(image)
-            # output = self._engine(image)
-
-            # 执行预测 (新版：接收对象)
-            output = self._engine(image)
-            print(f"{output}")
-            formatted_result = []
-            if output.results:
-                for line in output.results:
-                    # --- 处理坐标 Box ---
-                    # RapidOCR v3 默认返回 [x1,y1,x2,y2,x3,y3,x4,y4]
-                    # 我们将其转换为 [[x1,y1], [x2,y2], ...] 以便兼容旧逻辑
-                    box_coords = line[0] if isinstance(line, (list, tuple)) else line.get("bbox")
-
-                    if len(box_coords) == 8: # 扁平化坐标
-                        box = [[box_coords[i], box_coords[i+1]] for i in range(0, 8, 2)]
-                    else: # 已经是嵌套列表
-                        box = box_coords
-
-                    # --- 处理文本和置信度 ---
-                    if isinstance(line, (list, tuple)):
-                        text = line[1]
-                        score = line[2] if len(line) > 2 else 0
-                    elif isinstance(line, dict):
-                        text = line.get("text", "")
-                        score = line.get("score", 0)
-
-                    formatted_result.append([box, (text, score)])
-            return formatted_result
-
-        except Exception as e:
-            print(f"全屏 OCR 失败: {e}")
-            return []
 
     def ocr_full_screen(self, image) -> List:
         """
@@ -258,13 +211,16 @@ class RapidOCRUtil:
                         # 捕获单行解析错误，防止整个 OCR 崩溃
                         print(f"解析第 {i} 行 OCR 结果失败: {e}")
                         continue
-
             return formatted_result
-
         except Exception as e:
             print(f"全屏 OCR 失败: {e}")
             import traceback; traceback.print_exc()
             return []
+        finally:
+            # ⭐️ 核心“止血”代码：无论识别成功还是报错，都会执行这一步
+            # 强制触发 Python 的垃圾回收机制，释放未被自动清理的内存
+            gc.collect()
+
     def ocr_full_screen_fast(self, screenshot, short_side_len: int = 450) -> List[Dict[str, Any]]:
         """
         执行全屏 OCR，自动缩放图片以提升速度，并还原坐标。

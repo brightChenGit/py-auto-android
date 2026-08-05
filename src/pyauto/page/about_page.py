@@ -85,7 +85,7 @@ class AboutPage(QWidget):
              "• <b>Python 3.11.9</b><br>"
              "• <b>uiautomator2</b> & <b>uiautodev</b> (调试工具)<br>"
              "• <b>MySQL</b> 数据库<br>"
-             "• <b>PaddleOCR</b> (PP-OCRv5 mobile 模型)<br>"
+             "• <b>RapidOCR</b> (PP-OCRv4 mobile 模型)<br>"
              "• <b>PySide6</b> (GUI 界面)"
              ),
 

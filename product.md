@@ -27,7 +27,7 @@ pip install pipreqs
 ```
 2. 生成 requirements.txt
 ```bash
-pipreqs .
+pipreqs . --force --use-local --ignore=.venv,env,__pycache__,*.pyc,*.log,*.json
 ```
 . 代表当前目录。
 执行后，它会自动扫描所有 Python 文件，并在当前目录生成一个 requirements.txt 文件。
@@ -36,6 +36,7 @@ pipreqs .
 
 ```bash
 pipreqs src/pyauto --force --ignore=.venv,env,__pycache__,*.pyc,*.log,*.json
+pipreqs src/pyauto --force --use-local --ignore=env,__pycache__,*.pyc,*.log,*.json
 ```
 这将告诉 pipreqs 跳过虚拟环境和缓存文件，只扫描你的源代码。
 

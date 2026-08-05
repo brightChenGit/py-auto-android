@@ -1,36 +1,47 @@
 import os
-
-# 数据库配置
 import pymysql
 import logging
 from typing import Dict, Any, Optional, List
-from dbutils.pooled_db import PooledDB # 或者使用 PersistentDB
-
-DB_CONFIG = {
-    'host': 'xxxx',
-    'port': 3306,
-    'user': 'root',
-    'password': 'xxxx',
-    'database': 'xxxx',
-    'charset': 'utf8mb4',
-    'cursorclass': pymysql.cursors.DictCursor,
-    # 这里的 autocommit 建议设为 True
-    'autocommit': True,
-}
+from dbutils.pooled_db import PooledDB
 
 class DBHelper:
+    # 1. 定义固定配置，这些值将强制应用，无法被外部覆盖
+    _FIXED_CONFIG = {
+        'charset': 'utf8mb4',
+        'cursorclass': pymysql.cursors.DictCursor,
+        'autocommit': True,
+    }
+
+    # 2. 定义默认的可变配置，这些值可以被外部传入的配置覆盖
+    _DEFAULT_CONFIG = {
+        'host': 'xxxx',
+        'port': 3306,
+        'user': 'root',
+        'password': 'xxxx',
+        'database': 'xxxx',
+    }
+
     def __init__(self, config: Dict[str, Any] = None, logger: Optional[logging.Logger] = None):
-        self.config = config or DB_CONFIG.copy()
         self.logger = logger or logging.getLogger(__name__)
 
+        self.logger.info(f"数据库配置加载: {config.get('database')}")
+        # 3. 合并配置：以默认配置为基础，用传入的配置进行更新
+        base_config = self._DEFAULT_CONFIG.copy()
+        if config:
+            base_config.update(config)
+
+        # 4. 强制应用固定配置，确保它们不会被覆盖
+        base_config.update(self._FIXED_CONFIG)
+
+        self.config = base_config
+        base_config['port'] = int(base_config['port'])
         # 初始化连接池/持久连接
         # maxconnections=1 表示每个线程/进程只持有一个连接（最省资源且安全）
         # 在多进程中，每个进程都会初始化自己的 pool 实例
         pool_size = self.config.pop('maxconnections', 1)
-
         self.pool = PooledDB(
             creator=pymysql,
-            maxconnections=pool_size, # 动态值
+            maxconnections=pool_size,
             mincached=pool_size,
             blocking=True,
             ping=1,
@@ -94,7 +105,6 @@ class DBHelper:
             self.pool.close()
             self.logger.info(f"进程 [{os.getpid()}] 连接池已关闭")
 
-
     # === 上下文管理器支持 ===
     def __enter__(self):
         # 每次进入都确保连接可用
@@ -105,7 +115,6 @@ class DBHelper:
     def __exit__(self, exc_type, exc_val, exc_tb):
         # 通常在进程退出时调用
         self.close()
-
 
     def _reconnect(self):
         """重建数据库连接池"""

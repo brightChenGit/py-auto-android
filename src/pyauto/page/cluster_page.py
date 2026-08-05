@@ -8,7 +8,7 @@ from PySide6.QtCore import Qt
 from pyauto.utils.adb import AdbManager
 from pyauto.page.card_page import DeviceCard
 import pyauto.utils.logUtil
-
+from pyauto.utils.custom_dialog import ModernDialog
 
 # 获取全局 logger 实例
 logger = pyauto.utils.logUtil.get_logger()
@@ -95,10 +95,27 @@ class ClusterPage(QWidget):
 
         if success:
             self.status_label.setText("✅ " + message)
-            QMessageBox.information(self, "成功", f"{message}\n\n建议点击'刷新设备列表'重新连接设备。")
+            # QMessageBox.information(self, "成功", f"{message}\n\n建议点击'刷新设备列表'重新连接设备。")
+            # 调用自定义弹窗
+            dialog = ModernDialog(
+                title="成功",
+                message=message,
+                type="success",  # 可选: success, error, info
+                parent=self      # 传入 parent 确保弹窗在主窗口之上
+            )
+            dialog.exec()
         else:
             self.status_label.setText("❌ " + message)
-            QMessageBox.critical(self, "错误", message)
+            # QMessageBox.critical(self, "错误", message)
+            # 调用自定义弹窗
+            dialog = ModernDialog(
+                title="错误",
+                message=message,
+                type="error",  # 可选: success, error, info
+                parent=self      # 传入 parent 确保弹窗在主窗口之上
+            )
+            dialog.exec()
+
 
     def scan_devices(self):
         """

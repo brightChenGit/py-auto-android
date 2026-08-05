@@ -2,13 +2,14 @@
 import json
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
                                QLabel, QScrollArea, QFrame, QTextEdit, QLineEdit,
-                               QMessageBox)
+                               QMessageBox, QDialog)
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
 
 from pyauto.config.config_manager import DeviceConfigManager
 from pyauto.utils.adb import AdbManager  # 确保路径正确，根据实际项目结构调整
 import pyauto.utils.logUtil
+from pyauto.utils.custom_dialog import ModernDialog, ConfirmDialog
 
 # 获取全局 logger 实例
 logger = pyauto.utils.logUtil.get_logger()
@@ -226,15 +227,31 @@ class DeviceCard(QFrame):
 
     def _confirm_delete(self):
         """确认删除配置"""
-        reply = QMessageBox.question(
-            self,
-            "确认删除",
-            f"确定要从配置文件中删除设备 [{self.device_id}] 的配置吗？\n此操作不可恢复。",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No
+        # reply = QMessageBox.question(
+        #     self,
+        #     "确认删除",
+        #     f"确定要从配置文件中删除设备 [{self.device_id}] 的配置吗？\n此操作不可恢复。",
+        #     QMessageBox.Yes | QMessageBox.No,
+        #     QMessageBox.No
+        # )
+        # if reply == QMessageBox.Yes and self.on_delete_callback:
+        #     self.on_delete_callback(self.device_id)
+
+
+        dialog = ConfirmDialog(
+            title="确认删除",
+            message=f"确定要从配置文件中删除设备 [{self.device_id}] 的配置吗？\n此操作不可恢复。",
+            parent=self
         )
-        if reply == QMessageBox.Yes and self.on_delete_callback:
+
+        # exec() 会阻塞在这里，直到用户点击按钮
+        result = dialog.exec()
+        # --- 判断结果 ---
+        # QDialog.Accepted (确认) 或 QDialog.Rejected (取消)
+        if result == QDialog.DialogCode.Accepted and self.on_delete_callback:
             self.on_delete_callback(self.device_id)
+        else:
+            print("用户点击了【取消】 -> 什么都不做")
 
     def render_json_view(self):
         """渲染 JSON 文本框"""
@@ -376,9 +393,23 @@ class DeviceCard(QFrame):
                 self.current_config = data
                 self.render_kv_view()
             except json.JSONDecodeError as e:
-                QMessageBox.warning(self, "格式错误", f"JSON 解析失败:\n{e}")
+                # QMessageBox.warning(self, "格式错误", f"JSON 解析失败:\n{e}")
+                dialog = ModernDialog(
+                    title="格式错误",
+                    message=f"JSON 解析失败:\n{e}",
+                    type="error",  # 可选: success, error, info
+                    parent=self      # 传入 parent 确保弹窗在主窗口之上
+                )
+                dialog.exec()
             except Exception as e:
-                QMessageBox.warning(self, "错误", str(e))
+                # QMessageBox.warning(self, "错误", str(e))
+                dialog = ModernDialog(
+                    title="错误",
+                    message=str(e),
+                    type="error",  # 可选: success, error, info
+                    parent=self      # 传入 parent 确保弹窗在主窗口之上
+                )
+                dialog.exec()
         else:
             new_config = {}
             for row in self.kv_rows:
@@ -434,16 +465,38 @@ class DeviceCard(QFrame):
     def save_current_device(self):
         data = self.get_current_data()
         if data is None:
-            QMessageBox.warning(self, "保存失败", "数据格式错误。")
+            # QMessageBox.warning(self, "保存失败", "数据格式错误。")
+            dialog = ModernDialog(
+                title="保存失败",
+                message="数据格式错误。",
+                type="error",  # 可选: success, error, info
+                parent=self      # 传入 parent 确保弹窗在主窗口之上
+            )
+            dialog.exec()
             return
 
         if not isinstance(data, dict):
-            QMessageBox.warning(self, "保存失败", "配置必须是 JSON 对象格式。")
+            # QMessageBox.warning(self, "保存失败", "配置必须是 JSON 对象格式。")
+            dialog = ModernDialog(
+                title="保存失败",
+                message="配置必须是 JSON 对象格式。",
+                type="error",  # 可选: success, error, info
+                parent=self      # 传入 parent 确保弹窗在主窗口之上
+            )
+            dialog.exec()
             return
 
         DeviceConfigManager.save_config(self.device_id, data)
         status = "在线" if self.is_connected else "离线"
-        QMessageBox.information(self, "成功", f"设备 {self.device_id} ({status}) 配置已保存！")
+        # QMessageBox.information(self, "成功", f"设备 {self.device_id} ({status}) 配置已保存！")
+        dialog = ModernDialog(
+            title="成功",
+            message=f"设备 {self.device_id} ({status}) 配置已保存！",
+            type="success",  # 可选: success, error, info
+            parent=self      # 传入 parent 确保弹窗在主窗口之上
+        )
+        dialog.exec()
+
 
     def clear_layout(self, layout):
         while layout.count():
@@ -588,11 +641,32 @@ class JobManagePage(QWidget):
                 config_manager._save_configs()
                 # 刷新列表
                 self.load_devices()
-                QMessageBox.information(self, "成功", f"设备 [{device_id}] 的配置已删除。")
+                # QMessageBox.information(self, "成功", f"设备 [{device_id}] 的配置已删除。")
+                dialog = ModernDialog(
+                    title="成功",
+                    message=f"设备 [{device_id}] 的配置已删除。",
+                    type="success",  # 可选: success, error, info
+                    parent=self      # 传入 parent 确保弹窗在主窗口之上
+                )
+                dialog.exec()
             else:
-                QMessageBox.warning(self, "错误", "设备配置不存在。")
+                # QMessageBox.warning(self, "错误", "设备配置不存在。")
+                dialog = ModernDialog(
+                    title="错误",
+                    message=f"设备配置不存在。",
+                    type="error",  # 可选: success, error, info
+                    parent=self      # 传入 parent 确保弹窗在主窗口之上
+                )
+                dialog.exec()
         except Exception as e:
-            QMessageBox.critical(self, "错误", f"删除失败：{str(e)}")
+            # QMessageBox.critical(self, "错误", f"删除失败：{str(e)}")
+            dialog = ModernDialog(
+                title="错误",
+                message=f"删除失败：{str(e)}",
+                type="error",  # 可选: success, error, info
+                parent=self      # 传入 parent 确保弹窗在主窗口之上
+            )
+            dialog.exec()
 
     def save_all_configs(self):
         success_count = 0
@@ -613,9 +687,23 @@ class JobManagePage(QWidget):
         msg = f"保存完成！\n成功：{success_count} 个设备\n"
         if fail_count > 0:
             msg += f"失败：{fail_count} 个设备 (格式错误)"
-            QMessageBox.warning(self, "保存结果", msg)
+            # QMessageBox.warning(self, "保存结果", msg)
+            dialog = ModernDialog(
+                title="保存结果",
+                message=msg,
+                type="error",  # 可选: success, error, info
+                parent=self      # 传入 parent 确保弹窗在主窗口之上
+            )
+            dialog.exec()
         else:
-            QMessageBox.information(self, "保存结果", msg)
+            # QMessageBox.information(self, "保存结果", msg)
+            dialog = ModernDialog(
+                title="保存结果",
+                message=msg,
+                type="success",  # 可选: success, error, info
+                parent=self      # 传入 parent 确保弹窗在主窗口之上
+            )
+            dialog.exec()
 
     def clear_layout(self, layout):
         while layout.count():

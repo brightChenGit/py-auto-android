@@ -34,6 +34,7 @@ def build():
     args = [
         'src/pyauto/main.py', # 入口文件
         '--icon=src/pyauto/imgs/favicon.ico',
+        '--clean',  # ✅ 新增：清理缓存，确保进行全新的分析
         '--paths', 'src',
         '--name=py-auto',     # 输出的程序名
         '--onefile',          # [关键] 切换为单文件模式

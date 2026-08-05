@@ -5,12 +5,15 @@ import logging
 from typing import Dict, Any
 from multiprocessing import Queue
 import multiprocessing as mp
+
+from pyauto.config.config_base import UnifiedConfigManager
 from pyauto.scripts.task_runner import run_business_logic
 import psutil
 
 #
 import pyauto.utils.logUtil
 from pyauto.utils import logUtil
+from pyauto.utils.mail_utils import send_email_notification
 
 # 全局 logger 用于子进程本地 fallback
 local_logger = pyauto.utils.logUtil.get_logger()
@@ -176,6 +179,7 @@ def process_worker_entry(device_id: str, config_data: dict, log_queue: Queue, cm
                 for task in pending:
                     task_name = "监控任务" if task == monitor_task else "业务任务"
                     logger.warning(f"🛑 正在取消未完成的任务：{task_name}")
+
                     task.cancel()
                     try:
                         await task
@@ -204,6 +208,9 @@ def process_worker_entry(device_id: str, config_data: dict, log_queue: Queue, cm
             finally:
                 worker._is_running = False
                 logger.info("🏁 [MainRunner] 主运行器完全退出")
+                emailConfig=UnifiedConfigManager.get_config("email")
+                if emailConfig.get("task_end"):
+                    send_email_notification("[通知]采集结束",f"{device_id}设备采集任务结束")
 
         # 5. 运行循环
         # ✅ 修复：调用时不需要传参

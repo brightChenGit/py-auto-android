@@ -1,10 +1,9 @@
+# adb.py
 import re
 import subprocess
 import os
 import sys
 import time
-import atexit
-import signal
 from pathlib import Path
 from typing import List, Tuple, Optional
 import pyauto.utils.logUtil
@@ -14,11 +13,9 @@ from PIL import Image
 # 获取全局 logger 实例
 logger = pyauto.utils.logUtil.get_logger()
 
-# 全局集合：用于存储所有由 AdbManager 启动的 Popen 进程对象
-_active_adb_processes = set()
-
 class AdbManager:
     """ADB 服务管理工具类 - 统一使用项目内 bin/adb.exe"""
+
     # 类变量缓存 adb 路径，避免重复计算
     _adb_path: Optional[str] = None
 
@@ -38,6 +35,7 @@ class AdbManager:
 
         try:
             candidates = []
+
             # 1. PyInstaller 打包环境
             base_path = getattr(sys, '_MEIPASS', None)
             if base_path:
@@ -61,7 +59,7 @@ class AdbManager:
 
             # 遍历候选路径
             for candidate in candidates:
-                # 修复：使用 os.path.exists 检查字符串路径
+                #  修复：使用 os.path.exists 检查字符串路径
                 if os.path.exists(candidate):
                     cls._adb_path = candidate
                     logger.info(f" 找到内置 adb: {candidate}")
@@ -79,10 +77,12 @@ class AdbManager:
                 startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
                 startupinfo.wShowWindow = subprocess.SW_HIDE
                 creationflags = subprocess.CREATE_NO_WINDOW
+
             subprocess.run(['adb', 'version'], capture_output=True, check=False, startupinfo=startupinfo, creationflags=creationflags)
             cls._adb_path = 'adb'
             logger.info(f"警告：未在项目中找到 bin/adb.exe，将使用系统环境变量中的 adb。")
             return cls._adb_path
+
         except Exception as e:
             # 极端情况下，直接返回 'adb' 让 subprocess 去环境变量找
             logger.info(f"{e}")
@@ -101,8 +101,8 @@ class AdbManager:
         cmd = [cls.get_adb_path()]
         if device_id:
             cmd.extend(['-s', device_id])
-        cmd.extend(args)
 
+        cmd.extend(args)
         startupinfo = None
         creationflags = 0
 
@@ -111,52 +111,26 @@ class AdbManager:
             startupinfo = subprocess.STARTUPINFO()
             startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
             startupinfo.wShowWindow = subprocess.SW_HIDE
-            # 关键：创建新进程组，以便在退出时能按组清理
-            creationflags = subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP
-
-        proc = None
+            creationflags = subprocess.CREATE_NO_WINDOW
         try:
-            # 使用 Popen 启动进程，以便追踪
-            proc = subprocess.Popen(
+            res = subprocess.run(
                 cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                capture_output=True,
+                timeout=timeout,
+                check=False,
                 startupinfo=startupinfo,
                 creationflags=creationflags
             )
-
-            # 将进程对象加入全局追踪集合
-            _active_adb_processes.add(proc)
-
-            # 等待命令执行完成（行为等同于 subprocess.run）
-            stdout, stderr = proc.communicate(timeout=timeout)
-            returncode = proc.returncode
-
-            # 命令正常结束，从追踪集合中移除
-            _active_adb_processes.discard(proc)
-
-            if returncode == 0:
-                return True, "", stdout
+            if res.returncode == 0:
+                return True, "", res.stdout
             else:
-                err_msg = stderr.decode('utf-8', errors='ignore').strip()
+                err_msg = res.stderr.decode('utf-8', errors='ignore').strip()
                 return False, err_msg, b""
-
         except subprocess.TimeoutExpired:
-            # 超时处理：强制杀死并清理
-            if proc:
-                proc.kill()
-                proc.communicate()
-                _active_adb_processes.discard(proc)
             return False, f"命令执行超时 ({timeout}s)", b""
-
         except FileNotFoundError:
-            if proc:
-                _active_adb_processes.discard(proc)
             return False, "未找到 adb 可执行文件", b""
-
         except Exception as e:
-            if proc:
-                _active_adb_processes.discard(proc)
             return False, str(e), b""
 
     @staticmethod
@@ -166,16 +140,20 @@ class AdbManager:
         返回: (成功与否, 消息内容)
         """
         manager = AdbManager()
+
         # 1. 杀死服务
         success, err, _ = manager._run_adb_command(['kill-server'], timeout=10)
         if not success and "server not running" not in err.lower():
-            pass # 忽略错误，继续启动
+            pass
+
         # 2. 启动服务
         success, err, out = manager._run_adb_command(['start-server'], timeout=10)
+
         if success:
             return True, "ADB 服务已重启成功"
         else:
             return False, f"ADB 重启失败：{err}"
+
 
     @staticmethod
     def get_devices() -> List[str]:
@@ -189,14 +167,17 @@ class AdbManager:
         """
         manager = AdbManager()
         success, err, out = manager._run_adb_command(['devices'], timeout=5)
+
         if not success:
             return []
+
         lines = out.decode('utf-8', errors='ignore').splitlines()
         # 跳过第一行标题 "List of devices attached"
         if len(lines) > 1:
             lines = lines[1:]
         else:
             return []
+
         devices = []
         for line in lines:
             line = line.strip()
@@ -206,6 +187,7 @@ class AdbManager:
         # 使用自然排序
         devices.sort(key=natural_sort_key)
         return devices
+
 
     @staticmethod
     def set_tcpip_port(port: int, device_id: str) -> Tuple[bool, str]:
@@ -217,7 +199,9 @@ class AdbManager:
         """
         manager = AdbManager()
         success, err, _ = manager._run_adb_command(
-            ['tcpip', str(port)], device_id=device_id, timeout=10
+            ['tcpip', str(port)],
+            device_id=device_id,
+            timeout=10
         )
         if success:
             return True, "设置 TCP/IP 模式成功"
@@ -236,7 +220,8 @@ class AdbManager:
         manager = AdbManager()
         target = f"{ip}:{port}"
         success, err, _ = manager._run_adb_command(
-            ['connect', target], timeout=timeout
+            ['connect', target],
+            timeout=timeout
         )
         if success:
             return True, f"连接 {target} 成功"
@@ -248,17 +233,21 @@ class AdbManager:
         """
         获取设备屏幕截图并直接在源头进行压缩 (转换为 JPG)。
         对应原 card_page.py 中的：adb -s <id> exec-out screencap -p
+
         :param device_id: 设备 ID
         :param timeout: 超时时间
         :param compress_quality: JPEG 压缩质量 (1-100)，默认 85。数值越小压缩越大，画质越低。
-        如果设置为 100 或 None，则保留原始 PNG (不压缩)。
+                                 如果设置为 100 或 None，则保留原始 PNG (不压缩)。
         :return: (success, error_message, image_data_bytes)
         """
         manager = AdbManager()
         # 命令：exec-out screencap -p (获取原始 PNG 流)
         success, err, data = manager._run_adb_command(
-            ['exec-out', 'screencap', '-p'], timeout=timeout, device_id=device_id
+            ['exec-out', 'screencap', '-p'],
+            timeout=timeout,
+            device_id=device_id
         )
+
         if not success or not data:
             if not success:
                 if "device not found" in err.lower() or "no devices" in err.lower():
@@ -267,20 +256,25 @@ class AdbManager:
             return False, "截图数据为空", b""
 
         # --- 新增：源头压缩逻辑 ---
-        if compress_quality and 0 < compress_quality < 100:
+        if  compress_quality and 0 < compress_quality < 100:
             try:
                 # 将字节流加载为图片对象
                 img = Image.open(BytesIO(data))
+
                 # 如果原图是 RGBA (PNG 常见)，转为 RGB 以兼容 JPEG
                 if img.mode in ("RGBA", "P"):
                     img = img.convert("RGB")
+
                 # 保存到新的字节流，格式为 JPEG
                 output_buffer = BytesIO()
                 img.save(output_buffer, format="JPEG", quality=compress_quality, optimize=True)
+
                 # 获取压缩后的数据
                 compressed_data = output_buffer.getvalue()
+
                 logger.debug(f"截图已压缩：原始 {len(data)} 字节 -> 压缩后 {len(compressed_data)} 字节 (质量:{compress_quality})")
                 return True, "", compressed_data
+
             except Exception as e:
                 logger.warning(f"图片压缩失败，返回原始数据：{str(e)}")
                 # 如果压缩失败，降级返回原始 PNG 数据，保证流程不中断
@@ -301,8 +295,11 @@ class AdbManager:
         """
         manager = AdbManager()
         success, err, out = manager._run_adb_command(
-            ['shell', command], timeout=timeout, device_id=device_id
+            ['shell', command],
+            timeout=timeout,
+            device_id=device_id
         )
+
         if success:
             return True, "", out.decode('utf-8', errors='ignore').strip()
         else:
@@ -316,8 +313,10 @@ class AdbManager:
         manager = cls()
         # 使用 ip addr show wlan0 命令
         success, err, out = manager._run_adb_command(
-            ['shell', 'ip', 'addr', 'show', 'wlan0'], device_id=device_id
+            ['shell', 'ip', 'addr', 'show', 'wlan0'],
+            device_id=device_id
         )
+
         if success and out:
             output = out.decode('utf-8', errors='ignore')
             # 正则匹配 IPv4
@@ -332,18 +331,23 @@ class AdbManager:
     def usb_to_wifi(device_id: str) -> Tuple[bool, str]:
         """全自动 USB 切 WiFi"""
         logger.info(f"🚀 开始执行 USB 切 WiFi: {device_id}")
+
         # 1. 获取 IP
         ip = AdbManager.get_device_ip(device_id)
         if not ip:
             return False, "获取 IP 失败，请确保手机已连接 WiFi"
+
         logger.info(f"📱 设备 IP: {ip}")
+
         # 2. 开启 TCP/IP 模式
         success, msg = AdbManager.set_tcpip_port(5555, device_id)
         if not success:
             return False, f"开启 TCP/IP 模式失败: {msg}"
+
         # 3. 等待设备重启 ADB 服务
         logger.info("⏳ 等待设备切换端口...")
         time.sleep(2)
+
         # 4. 尝试连接 WiFi
         for i in range(3):
             success, msg = AdbManager.connect_wifi(ip, 5555)
@@ -352,6 +356,7 @@ class AdbManager:
                 return True, ip
             logger.warning(f"⚠️ 第 {i+1} 次连接尝试失败: {msg}，重试中...")
             time.sleep(1)
+
         return False, "WiFi 连接超时或失败（模拟器不支持转wifi）"
 
 def get_adb_executable() -> str:
@@ -361,46 +366,12 @@ def get_adb_executable() -> str:
     """
     return AdbManager.get_adb_path()
 
-
-# ================= 退出清理机制 =================
-
-def _cleanup_adb_processes():
-    """
-    程序退出时调用，负责杀死所有我们启动的 adb.exe 进程。
-    防止残留的 adb.exe 占用 PyInstaller 的临时文件夹 (_MEIxxxx)。
-    """
-    if not _active_adb_processes:
-        return
-
-    logger.info(f"正在清理 {len(_active_adb_processes)} 个遗留的 adb 进程...")
-    # 遍历副本，防止在循环中修改原集合引发 RuntimeError
-    for proc in list(_active_adb_processes):
-        if proc.poll() is None:  # 检查进程是否还在运行
-            try:
-                proc.kill()  # 发送终止信号
-                logger.debug(f"已发送终止信号给 adb 进程: {proc.pid}")
-            except Exception as e:
-                logger.warning(f"终止进程 {proc.pid} 时出错: {e}")
-        # 无论是否成功，都从集合中移除
-        _active_adb_processes.discard(proc)
-
-# 1. 注册 atexit，确保程序正常退出 (sys.exit) 时调用清理函数
-atexit.register(_cleanup_adb_processes)
-
-# 2. 注册信号处理器，确保 Ctrl+C 中断或系统 kill 时也能调用清理函数
-def _signal_handler(sig, frame):
-    logger.info("收到退出信号，正在清理 adb 资源...")
-    _cleanup_adb_processes()
-    sys.exit(0)
-
-signal.signal(signal.SIGINT, _signal_handler)   # 处理 Ctrl+C
-signal.signal(signal.SIGTERM, _signal_handler)  # 处理 kill 命令
-
 # 测试代码 (可选)
 if __name__ == "__main__":
     logger.info(f"当前使用的 ADB 路径：{AdbManager.get_adb_path()}")
     devs = AdbManager.get_devices()
     logger.info(f"连接的设备：{devs}")
+
     if devs:
         dev = devs[0]
         logger.info(f"正在获取设备 {dev} 的截图 (带压缩)...")

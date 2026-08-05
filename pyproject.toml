@@ -25,7 +25,9 @@ dependencies = [
     "qasync==0.28.0",
     "rapidocr==3.8.1",
     "Tools==1.0.28",
-    "uiautomator2==3.5.0"
+    "uiautomator2==3.7.0",
+    "waitress==3.2.0",
+    "cryptography==50.0.0"
 ]
 
 authors = [
